@@ -1,0 +1,67 @@
+#!/bin/bash
+
+###########################
+#
+#       Author: xzw
+#       Date: 2023-05-01
+#       Description: Draw Pairwise synteny 
+#
+###########################
+
+
+for ((i=1;i<=9;i++)) do mkdir 0${i}.HIC_ASM_${i}; done
+cd 00.origin_genome
+
+# get cds and gff3
+for ((i=0,j=1; i<9,j<=9; i++,j++)) do
+sed -n "/HIC_ASM_${i}/{N;p}" early-single.cds > ../0${j}.HIC_ASM_${j}/early_${i}.cds;
+sed -n "/HIC_ASM_${i}/p" early.gff3 > ../0${j}.HIC_ASM_${j}/early_${i}.gff3;
+sed -n "/Hic_asm_${i}/p" later.gff3 > ../0${j}.HIC_ASM_${j}/later_${i}.gff3;
+sed -n "/Hic_asm_${i}/p" later.gff3| sed -n "/mRNA/p" | gawk '{print $9}' | sed 's/^ID=//g' | sed 's/;.*$//g' | uniq  > ../0${j}.HIC_ASM_${j}/later.list;
+seqtk subseq later-single.cds ../0${j}.HIC_ASM_${j}/later.list > ../0${j}.HIC_ASM_${j}/later_${i}.cds;
+done
+
+cd ..
+cd 01.split_genome
+
+
+for ((i=0;i<9;i++)) do mkdir 0${i}.chr${i};done
+cd .. && mkdir 02.reverse && cp 01.split_genome/* 02.reverse
+
+# deal the seq name 
+ls | grep 0 | while read id
+do cd ${id}
+ls | grep _ | while read tmp
+do mv ${tmp} $(echo ${tmp} | sed 's/_[0-9]/Chr/')
+done
+sed -i.bak '/mRNA/!d' earlyChr.gff3 laterChr.gff3
+sed -i "s/^Hic_asm_[0-8]/Hic_asm_$(echo ${id} | sed 's/0[0-9]\.chr//')/g" laterChr.gff3
+
+cd ..
+done
+
+# draw synteny respectively
+ls -p | grep / | while read id; do
+cd ${id}
+python -m jcvi.formats.gff bed --type=mRNA --key=ID earlyChr.gff3 -o early.bed
+python -m jcvi.formats.gff bed --type=mRNA --key=ID laterChr.gff3 -o later.bed
+python -m jcvi.formats.fasta format earlyChr.cds early.cds
+python -m jcvi.formats.fasta format laterChr.cds later.cds
+python -m jcvi.compara.catalog ortholog early later
+python -m jcvi.compara.synteny screen --minspan=30 --simple early.later.anchors early.later.anchors.new
+ln -s ../../layout
+echo $(sed -n '1p' earlyChr.gff3 | gawk '{print $1}') > seqids
+echo $(sed -n '1p' laterChr.gff3 | gawk '{print $1}') >> seqids
+python -m jcvi.graphics.karyotype seqids layout
+cd ..
+done
+
+
+# total
+mkdir 09.chr_total
+ls | egrep "chr[0-8]" | while read id; do
+cat ${id}/earlyChr.gff3 >> 09.chr_total/earlyChr.gff3
+cat ${id}/laterChr.gff3 >> 09.chr_total/laterChr.gff3
+cat ${id}/earlyChr.cds >> 09.chr_total/earlyChr.cds
+cat ${id}/laterChr.cds >> 09.chr_total/laterChr.cds
+done;
