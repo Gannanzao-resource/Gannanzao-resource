@@ -8,6 +8,7 @@ This repository contains the proteome of Gannanzao and Newhall, along with their
 + **later.fa/gff3**: *Citrus sinensis* Osbeck cv. Newhall.
 + **seqids**: which tells the plotter which set of chromosomes to include.
 + **layout**:  which tells the plotter where to draw what.
++ **denovo.sh**: script to assemble.
 
 Requirement:
 
